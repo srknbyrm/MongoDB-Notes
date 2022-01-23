@@ -47,3 +47,77 @@ Localhost Binding by Default
 
 By default, MongoDB launches with bindIp set to 127.0.0.1, which binds to the localhost network interface. This means that the mongod can only accept connections from clients that are running on the same machine. Remote clients will not be able to connect to the mongod, and the mongod will not be able to initialize a replica set unless this value is set to a valid network interface.
 
+
+SHARDING
+
+Inside the config servers 1 primary 2 secondary run the following commands
+
+--> Port of first one 4001
+mongod --configsvr --replSet cfgrs --port 27017 --dbpath /data/db
+
+--> Port of first second one 4002
+mongod --configsvr --replSet cfgrs --port 27017 --dbpath /data/db
+
+--> Port of first third one 4003
+mongod --configsvr --replSet cfgrs --port 27017 --dbpath /data/db
+
+Connect to any config server 
+mongo mongodb://192.168.1.81:40001
+Then start config servers.
+rs.initiate(
+  {
+    _id: "cfgrs",
+    configsvr: true,
+    members: [
+      { _id : 0, host : "192.168.1.81:40001" },
+      { _id : 1, host : "192.168.1.81:40002" },
+      { _id : 2, host : "192.168.1.81:40003" }
+    ]
+  }
+)
+
+rs.status()
+
+Shard 01
+
+50001
+mongod --shardsvr --replSet shard1rs --port 27017 --dbpath /data/db
+
+50002 - secondary
+mongod --shardsvr --replSet shard1rs --port 27017 --dbpath /data/db
+
+50003 - secondary
+mongod --shardsvr --replSet shard1rs --port 27017 --dbpath /data/db
+
+Connect to any shard
+mongo mongodb://192.168.1.81:50001
+
+rs.initiate(
+  {
+    _id: "shard1rs",
+    members: [
+      { _id : 0, host : "192.168.1.81:50001" },
+      { _id : 1, host : "192.168.1.81:50002" },
+      { _id : 2, host : "192.168.1.81:50003" }
+    ]
+  }
+)
+
+rs.status()
+
+
+Mongos
+
+Connect mongos withh confog servers
+6000 -> one monngos
+mongos --configdb cfgrs/192.168.1.81:40001,192.168.1.81:40002,192.168.1.81:40003 --bind_ip 0.0.0.0 --port 27017
+
+Connect to router
+mongo mongodb://192.168.1.81:60000
+
+mongos> sh.addShard("shard1rs/192.168.1.81:50001,192.168.1.81:50002,192.168.1.81:50003")
+mongos> sh.status()
+
+
+
+
